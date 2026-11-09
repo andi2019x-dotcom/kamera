@@ -6,8 +6,8 @@
 :root{--pn:#1a1b1d;--ac:#ff9f1c;--tx:#e8e8e8;--dm:#7a7d82}
 *{box-sizing:border-box;-webkit-tap-highlight-color:transparent;user-select:none}
 html,body{margin:0;height:100%;background:#000;color:var(--tx);font-family:system-ui,sans-serif;overflow:hidden;touch-action:manipulation}
-#view{position:fixed;inset:0;width:100%;height:100%;object-fit:cover}
-#vid{position:fixed;left:0;top:0;width:64px;height:64px;opacity:.01;pointer-events:none;z-index:-1}
+#vid{position:fixed;left:0;top:0;width:100%;height:100%;object-fit:cover;background:#000;pointer-events:none;transform-origin:center}
+#vid.rot{left:50%;top:50%;width:100vh;height:100vw;transform:translate(-50%,-50%) rotate(-90deg)}
 #top{position:fixed;top:0;left:0;right:0;padding:calc(env(safe-area-inset-top,0px) + 8px) 12px 18px;display:flex;justify-content:space-between;align-items:center;font:600 15px ui-monospace,monospace;background:linear-gradient(#000d,#0000)}
 #top b{color:var(--ac);font-weight:700}
 #fi{font:600 12px system-ui;color:var(--dm);padding:6px 8px;border:1px solid #333;border-radius:8px;background:#0008}
@@ -39,7 +39,6 @@ html,body{margin:0;height:100%;background:#000;color:var(--tx);font-family:syste
 #roll h3{margin:0 0 4px}#roll button{height:54px;border-radius:10px;border:1px solid #444;background:#222;color:var(--tx);font:600 16px system-ui}
 [hidden]{display:none!important}
 </style></head><body>
-<canvas id="view" width="540" height="960"></canvas>
 <video id="vid" playsinline muted autoplay></video>
 <div id="top"><span id="hud"></span><span id="fi"></span></div>
 <div id="msg" hidden></div><div id="flash"></div>
@@ -62,7 +61,7 @@ const F=[{n:'Agfa APX 400',iso:400,bw:1,g:.075,c:1.2,sat:0,m:[1,1,1]},
 const LIN=new Float32Array(256).map((_,i)=>Math.pow(i/255,2.2));
 const nz=new Float32Array(65536).map(()=>(Math.random()+Math.random()+Math.random()-1.5)*2);
 let st={t:8,a:5,l:2,f:1,n:0};try{Object.assign(st,JSON.parse(localStorage.getItem('kamSt')))}catch(e){}
-const vid=$('vid'),view=$('view'),vx=view.getContext('2d'),VW=540,VH=960,W=360,H=640,src=cv(W,H),sx=src.getContext('2d'),mc=cv(24,32),mx=mc.getContext('2d',{willReadFrequently:true});
+const vid=$('vid'),W=360,H=640,src=cv(W,H),sx=src.getContext('2d'),mc=cv(24,32),mx=mc.getContext('2d',{willReadFrequently:true});
 sx.fillStyle='#000';sx.fillRect(0,0,W,H);
 let sceneEV=12,meterL=.18,busy=0;
 const minA=()=>A.findIndex(x=>x>=L[st.l].a-.01);
@@ -94,7 +93,7 @@ function P(){const f=F[st.f],l=L[st.l],t=S[st.t],N=Math.max(A[st.a],l.a);
 
 function drawVid(c,w,h,a,z){const vw=vid.videoWidth,vh=vid.videoHeight,rot=vw>vh,asp=rot?h/w:w/h;let cw,ch;
  if(vw/vh>asp){ch=vh;cw=vh*asp}else{cw=vw;ch=vw/asp}cw/=z;ch/=z;c.save();c.globalAlpha=a;
- if(rot){c.translate(w,0);c.rotate(Math.PI/2);c.drawImage(vid,(vw-cw)/2,(vh-ch)/2,cw,ch,0,0,h,w)}
+ if(rot){c.translate(0,h);c.rotate(-Math.PI/2);c.drawImage(vid,(vw-cw)/2,(vh-ch)/2,cw,ch,0,0,h,w)}
  else c.drawImage(vid,(vw-cw)/2,(vh-ch)/2,cw,ch,0,0,w,h);c.restore()}
 
 function grade(sc_,tc,w,h,p,bpx){
@@ -116,12 +115,15 @@ function grade(sc_,tc,w,h,p,bpx){
   }}
  tc.getContext('2d').putImageData(img,0,0)}
 
-let last=0;
+let last=0,lastS=0,evBase=12,evOk=0;
 function loop(t){requestAnimationFrame(loop);if(t-last<33||!vid.videoWidth)return;last=t;
- try{const p=P();drawVid(vx,VW,VH,1,p.z);drawVid(sx,W,H,p.a,p.z);
+ try{const p=P();const rt=vid.videoWidth>vid.videoHeight&&innerHeight>=innerWidth;vid.classList.toggle('rot',rt);vid.style.transform=(rt?'translate(-50%,-50%) rotate(-90deg) ':'')+'scale('+p.z+')';
+ const tr=vid.srcObject&&vid.srcObject.getVideoTracks()[0];
+ if(tr&&t-lastS>500){lastS=t;try{const g=tr.getSettings(),ts=g.exposureTime*1e-4;evOk=g.exposureTime>0&&g.iso>0&&ts>1e-6&&ts<1;if(evOk)evBase=Math.log2(3.24/ts)-Math.log2(g.iso/100)}catch(e){evOk=0}}
+ $('info').textContent=(F[st.f].bw?'S/W':'Farbe')+(evOk?'':' · Schätzwert');drawVid(sx,W,H,p.a,p.z);
  mx.drawImage(src,0,0,24,32);const q=mx.getImageData(0,0,24,32).data;let s=0;
  for(let i=0;i<q.length;i+=4)s+=LIN[(q[i]*.299+q[i+1]*.587+q[i+2]*.114)|0];
- meterL+=(Math.max(s/768,1e-4)-meterL)*.3;sceneEV=12+Math.log2(meterL/.18);
+ meterL+=(Math.max(s/768,1e-4)-meterL)*.3;sceneEV+=((evOk?evBase:12)+Math.log2(meterL/.18)-sceneEV)*.4;
  const cl=Math.max(-3,Math.min(3,p.stops));$('nd').style.left=(cl+3)/6*100+'%';
  $('mv').textContent=(p.stops>0?'+':'')+p.stops.toFixed(1)+' EV';$('nd').style.background=Math.abs(p.stops)<.4?'#4cd964':'var(--ac)';
  }catch(e){console.error(e)}}

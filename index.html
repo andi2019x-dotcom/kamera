@@ -13,16 +13,18 @@ html,body{margin:0;height:100%;background:#000;color:var(--tx);font-family:syste
 #fi{font:600 12px system-ui;color:var(--dm);padding:6px 8px;border:1px solid #333;border-radius:8px;background:#0008}
 #msg{position:fixed;top:40%;left:10%;right:10%;text-align:center;padding:16px;background:#000c;border-radius:12px;font-size:15px}
 #flash{position:fixed;inset:0;background:#fff;opacity:0;pointer-events:none;transition:opacity .25s}
-#bot{position:fixed;left:0;right:0;bottom:0;padding:14px 10px calc(env(safe-area-inset-bottom,0px) + 10px);background:linear-gradient(#0000,#000d 18%,#0b0b0c 40%);display:flex;flex-direction:column;gap:8px;border-top:1px solid #222}
+#bot{overflow:hidden;position:fixed;left:0;right:0;bottom:0;padding:14px 10px calc(env(safe-area-inset-bottom,0px) + 10px);background:linear-gradient(#0000,#000d 18%,#0b0b0c 40%);display:flex;flex-direction:column;gap:8px;border-top:1px solid #222}
 #meter{position:relative;height:30px;margin:0 6px;border-bottom:2px solid #444;font:11px ui-monospace,monospace;color:var(--dm)}
 #meter span.t{position:absolute;bottom:2px;transform:translateX(-50%);padding-bottom:2px}
 #nd{position:absolute;bottom:-2px;width:4px;height:28px;margin-left:-2px;background:var(--ac);border-radius:2px;transition:left .2s}
 #mv{position:absolute;right:0;top:-2px;color:var(--ac);font-weight:700}
-.row{display:flex;align-items:center;gap:6px}
+.row{display:flex;align-items:center;gap:6px;min-width:0}
+#wh{display:flex;flex-direction:column;gap:8px;min-width:0}
+#info{white-space:pre-line}
 .row label{flex:0 0 46px;font:600 11px system-ui;color:var(--dm);text-transform:uppercase}
-.sw{position:relative;flex:1}
+.sw{position:relative;flex:1;min-width:0}
 .sw:after{content:"";position:absolute;left:50%;top:3px;bottom:3px;width:76px;margin-left:-38px;border:2px solid var(--ac);border-radius:8px;pointer-events:none}
-.strip{display:flex;overflow-x:auto;scroll-snap-type:x mandatory;scrollbar-width:none;height:48px;background:var(--pn);border-radius:10px}
+.strip{display:flex;overflow-x:auto;scroll-snap-type:x mandatory;scrollbar-width:none;height:48px;width:100%;background:var(--pn);border-radius:10px}
 .strip::-webkit-scrollbar{display:none}
 .strip:before,.strip:after{content:"";flex:0 0 calc(50% - 38px)}
 .strip i{flex:0 0 76px;scroll-snap-align:center;display:flex;align-items:center;justify-content:center;font:600 16px ui-monospace,monospace;font-style:normal;color:var(--dm)}
@@ -38,20 +40,38 @@ html,body{margin:0;height:100%;background:#000;color:var(--tx);font-family:syste
 #roll>div{width:100%;max-width:380px;background:var(--pn);border-radius:16px;padding:18px;display:flex;flex-direction:column;gap:10px}
 #roll h3{margin:0 0 4px}#roll button{height:54px;border-radius:10px;border:1px solid #444;background:#222;color:var(--tx);font:600 16px system-ui}
 [hidden]{display:none!important}
+@media (orientation:landscape){
+ :root{--pw:min(330px,46vw)}
+ #top{right:var(--pw)}
+ #bot{top:0;left:auto;right:0;bottom:0;width:var(--pw);padding:calc(env(safe-area-inset-top,0px) + 8px) calc(env(safe-area-inset-right,0px) + 8px) calc(env(safe-area-inset-bottom,0px) + 8px) 8px;background:#0b0b0c;border-top:0;border-left:1px solid #222}
+ #wh{flex:1;min-height:0;flex-direction:row;gap:6px}
+ .row{flex:1;flex-direction:column;align-items:stretch;gap:4px;min-height:0}
+ .row label{flex:0 0 auto;text-align:center}
+ .sw{flex:1;min-height:0}
+ .strip{position:absolute;inset:0;height:auto;flex-direction:column;overflow-x:hidden;overflow-y:auto;scroll-snap-type:y mandatory}
+ .strip:before,.strip:after{flex:0 0 calc(50% - 24px)}
+ .strip i{flex:0 0 48px;height:48px;font-size:15px}
+ .sw:after{left:3px;right:3px;top:50%;bottom:auto;height:48px;width:auto;margin:-24px 0 0}
+ #sh{min-height:72px}
+ #btn{width:64px;height:64px}
+}
 </style></head><body>
 <video id="vid" playsinline muted autoplay></video>
 <div id="top"><span id="hud"></span><span id="fi"></span></div>
 <div id="msg" hidden></div><div id="flash"></div>
 <div id="bot">
  <div id="meter"><b id="nd"></b><span id="mv"></span></div>
+ <div id="wh">
  <div class="row"><label>Zeit</label><div class="sw"><div class="strip" id="s1"></div></div></div>
  <div class="row"><label>Blende</label><div class="sw"><div class="strip" id="s2"></div></div></div>
  <div class="row"><label>Optik</label><div class="sw"><div class="strip" id="s3"></div></div></div>
+ </div>
  <div id="sh"><div id="cn"></div><button id="btn" aria-label="Auslöser"></button><button id="nf" hidden>Neuen Film einlegen</button><div id="info"></div></div>
 </div>
 <div id="roll" hidden><div><h3 id="rt"></h3><div id="rb" style="display:flex;flex-direction:column;gap:10px"></div><button id="rc">Abbrechen</button></div></div>
 <script>
 const $=i=>document.getElementById(i),cv=(w,h)=>{const c=document.createElement('canvas');c.width=w;c.height=h;return c};
+const MQ=matchMedia('(orientation:landscape)'),IS=()=>MQ.matches?48:76,VER='v0.5';
 const S=[1,1/2,1/4,1/8,1/15,1/30,1/60,1/125,1/250,1/500,1/1000],SL=['1"','1/2','1/4','1/8','1/15','1/30','1/60','1/125','1/250','1/500','1/1000'];
 const A=[1.4,2,2.8,4,5.6,8,11,16,22];
 const L=[{f:28,a:2.8,v:.45},{f:35,a:2,v:.32},{f:50,a:1.4,v:.22},{f:135,a:2.8,v:.14},{f:200,a:4,v:.10}];
@@ -67,9 +87,9 @@ let sceneEV=12,meterL=.18,busy=0;
 const minA=()=>A.findIndex(x=>x>=L[st.l].a-.01);
 
 function mk(id,lab,set){const el=$(id);lab.forEach(x=>{const i=document.createElement('i');i.textContent=x;el.append(i)});let tm;
- el.onscroll=()=>{clearTimeout(tm);tm=setTimeout(()=>set(Math.max(0,Math.min(lab.length-1,Math.round(el.scrollLeft/76)))),80)};
- el.onclick=e=>{const i=[...el.children].indexOf(e.target);if(i>=0)el.scrollTo({left:i*76,behavior:'smooth'})};return el}
-const sc=(el,i)=>el.scrollTo({left:i*76});
+ el.onscroll=()=>{clearTimeout(tm);tm=setTimeout(()=>set(Math.max(0,Math.min(lab.length-1,Math.round((MQ.matches?el.scrollTop:el.scrollLeft)/IS())))),80)};
+ el.onclick=e=>{const i=[...el.children].indexOf(e.target);if(i>=0)el.scrollTo(MQ.matches?{top:i*IS(),behavior:'smooth'}:{left:i*IS(),behavior:'smooth'})};return el}
+const sc=(el,i)=>el.scrollTo(MQ.matches?{top:i*IS(),left:0}:{left:i*IS(),top:0});
 const s1=mk('s1',SL,v=>{st.t=v;ui()});
 const s2=mk('s2',A.map(a=>'f/'+a),v=>{const m=minA();if(v<m){v=m;sc(s2,m)}st.a=v;ui()});
 const s3=mk('s3',L.map(l=>l.f+'/'+l.a),v=>{st.l=v;const m=minA();if(st.a<m){st.a=m;sc(s2,m)}ui()});
@@ -80,7 +100,7 @@ function ui(){const l=L[st.l],f=F[st.f];
  $('hud').innerHTML=`<b>${SL[st.t]}</b> f/${A[st.a]} ${l.f}mm`;
  $('fi').textContent=f.n+' · ISO '+f.iso;
  $('cn').textContent=st.n+'/36';
- $('info').textContent=(f.bw?'S/W':'Farbe');
+ $('info').textContent=(f.bw?'S/W':'Farbe')+'\n'+VER;
  const full=st.n>=36;$('btn').disabled=full;$('btn').hidden=full;$('nf').hidden=!full;
  try{localStorage.setItem('kamSt',JSON.stringify(st))}catch(e){}}
 
@@ -115,12 +135,14 @@ function grade(sc_,tc,w,h,p,bpx){
   }}
  tc.getContext('2d').putImageData(img,0,0)}
 
-let last=0,lastS=0,evBase=12,evOk=0;
-function loop(t){requestAnimationFrame(loop);if(t-last<33||!vid.videoWidth)return;last=t;
+let last=0,lastS=0,evBase=12,evOk=0,lastCT=-1,lastCTt=0,lastRs=0;
+function loop(t){requestAnimationFrame(loop);
+ if(vid.videoWidth&&!document.hidden){if(vid.currentTime!==lastCT){lastCT=vid.currentTime;lastCTt=t}else if(t-lastCTt>2500&&t-lastRs>5000){lastRs=t;lastCTt=t;restart()}}
+ if(t-last<33||!vid.videoWidth)return;last=t;
  try{const p=P();const rt=vid.videoWidth>vid.videoHeight&&innerHeight>=innerWidth;vid.classList.toggle('rot',rt);vid.style.transform=(rt?'translate(-50%,-50%) rotate(-90deg) ':'')+'scale('+p.z+')';
  const tr=vid.srcObject&&vid.srcObject.getVideoTracks()[0];
  if(tr&&t-lastS>500){lastS=t;try{const g=tr.getSettings(),ts=g.exposureTime*1e-4;evOk=g.exposureTime>0&&g.iso>0&&ts>1e-6&&ts<1;if(evOk)evBase=Math.log2(3.24/ts)-Math.log2(g.iso/100)}catch(e){evOk=0}}
- $('info').textContent=(F[st.f].bw?'S/W':'Farbe')+(evOk?'':' · Schätzwert');drawVid(sx,W,H,p.a,p.z);
+ $('info').textContent=(F[st.f].bw?'S/W':'Farbe')+(evOk?'':' · Schätzwert')+'\n'+VER;drawVid(sx,W,H,p.a,p.z);
  mx.drawImage(src,0,0,24,32);const q=mx.getImageData(0,0,24,32).data;let s=0;
  for(let i=0;i<q.length;i+=4)s+=LIN[(q[i]*.299+q[i+1]*.587+q[i+2]*.114)|0];
  meterL+=(Math.max(s/768,1e-4)-meterL)*.3;sceneEV+=((evOk?evBase:12)+Math.log2(meterL/.18)-sceneEV)*.4;
@@ -141,10 +163,13 @@ function openRoll(){const full=st.n>=36;$('rt').textContent=full?'Film voll – 
   b.onclick=()=>{st.f=i;st.n=0;$('roll').hidden=true;ui()};$('rb').append(b)});$('roll').hidden=false}
 $('btn').onclick=shoot;$('nf').onclick=openRoll;$('fi').onclick=openRoll;$('rc').onclick=()=>$('roll').hidden=true;
 
-async function start(){try{const s=await navigator.mediaDevices.getUserMedia({video:{facingMode:{ideal:'environment'},width:{ideal:1080},height:{ideal:1920}},audio:false});
- vid.srcObject=s;await vid.play();$('msg').hidden=true}
+function restart(){const s=vid.srcObject;if(s)s.getTracks().forEach(k=>k.stop());vid.srcObject=null;start()}
+async function start(){try{const s=await navigator.mediaDevices.getUserMedia({video:{facingMode:{ideal:'environment'},width:{ideal:1080},height:{ideal:1920},frameRate:{ideal:30}},audio:false});
+ vid.srcObject=s;await vid.play();s.getVideoTracks()[0].onended=restart;$('msg').hidden=true}
  catch(e){$('msg').hidden=false;$('msg').textContent='Kamera nicht verfügbar ('+(e.message||e.name)+'). Tippen für neuen Versuch.'}}
 $('msg').onclick=start;
+document.body.addEventListener('touchstart',()=>{if(vid.paused&&vid.srcObject)vid.play().catch(()=>{})},{passive:true});
+MQ.addEventListener('change',()=>setTimeout(()=>{sc(s1,st.t);sc(s2,Math.max(st.a,minA()));sc(s3,st.l)},150));
 document.addEventListener('visibilitychange',()=>{if(document.hidden)return;const s=vid.srcObject;if(s&&s.getVideoTracks().some(t=>t.readyState==='live'))vid.play().catch(()=>{});else start()});
 ui();requestAnimationFrame(()=>{sc(s1,st.t);sc(s2,Math.max(st.a,minA()));sc(s3,st.l)});
 start();requestAnimationFrame(loop);

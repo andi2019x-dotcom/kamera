@@ -1,4 +1,5 @@
 <!DOCTYPE html>
+<!-- v0.7: Sucher zeigt komplettes Bildfeld (35mm 3:2 / 6x6), Filmeinlegen mit Format/Typ/Anzahl, Rollenverwaltung (Wechselsack), Dateiname mit Rolleninfo -->
 <html lang="de"><head><meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,user-scalable=no,viewport-fit=cover">
 <title>Kamera</title>
@@ -6,13 +7,13 @@
 :root{--pn:#1a1b1d;--ac:#ff9f1c;--tx:#e8e8e8;--dm:#7a7d82}
 *{box-sizing:border-box;-webkit-tap-highlight-color:transparent;user-select:none}
 html,body{margin:0;height:100%;background:#000;color:var(--tx);font-family:system-ui,sans-serif;overflow:hidden;touch-action:manipulation}
-#vid{position:fixed;left:0;top:0;width:100%;height:100%;object-fit:cover;background:#000;pointer-events:none;transform-origin:center}
-#vid.rot{left:50%;top:50%;width:100vh;height:100vw;transform:translate(-50%,-50%) rotate(-90deg)}
+#fr{position:fixed;overflow:hidden;background:#000;outline:1px solid #3a3c40;left:0;top:0;width:0;height:0}
+#vid{position:absolute;left:50%;top:50%;object-fit:cover;background:#000;pointer-events:none;transform-origin:center}
 #top{position:fixed;top:0;left:0;right:0;padding:calc(env(safe-area-inset-top,0px) + 8px) 12px 18px;display:flex;justify-content:space-between;align-items:center;font:600 15px ui-monospace,monospace;background:linear-gradient(#000d,#0000)}
 #top b{color:var(--ac);font-weight:700}
 #fi{font:600 12px system-ui;color:var(--dm);padding:6px 8px;border:1px solid #333;border-radius:8px;background:#0008}
 #msg{position:fixed;top:40%;left:10%;right:10%;text-align:center;padding:16px;background:#000c;border-radius:12px;font-size:15px}
-#flash{position:fixed;inset:0;background:#fff;opacity:0;pointer-events:none;transition:opacity .25s}
+#flash{position:absolute;inset:0;background:#fff;opacity:0;pointer-events:none;transition:opacity .25s}
 #bot{overflow:hidden;position:fixed;left:0;right:0;bottom:0;padding:14px 10px calc(env(safe-area-inset-bottom,0px) + 10px);background:linear-gradient(#0000,#000d 18%,#0b0b0c 40%);display:flex;flex-direction:column;gap:8px;border-top:1px solid #222}
 #meter{position:relative;height:30px;margin:0 6px;border-bottom:2px solid #444;font:11px ui-monospace,monospace;color:var(--dm)}
 #meter span.t{position:absolute;bottom:2px;transform:translateX(-50%);padding-bottom:2px}
@@ -37,8 +38,9 @@ html,body{margin:0;height:100%;background:#000;color:var(--tx);font-family:syste
 #btn:active{transform:scale(.93)}#btn:disabled{background:#444;border-color:#666}
 #nf{flex:2;height:60px;border:0;border-radius:12px;background:var(--ac);color:#000;font:700 17px system-ui}
 #roll{position:fixed;inset:0;background:#000d;display:flex;align-items:center;justify-content:center;padding:20px}
-#roll>div{width:100%;max-width:380px;background:var(--pn);border-radius:16px;padding:18px;display:flex;flex-direction:column;gap:10px}
-#roll h3{margin:0 0 4px}#roll button{height:54px;border-radius:10px;border:1px solid #444;background:#222;color:var(--tx);font:600 16px system-ui}
+#roll>div{width:100%;max-width:380px;max-height:100%;overflow-y:auto;background:var(--pn);border-radius:16px;padding:18px;display:flex;flex-direction:column;gap:10px}
+#roll h3{margin:0 0 4px}#roll button{min-height:54px;border-radius:10px;border:1px solid #444;background:#222;color:var(--tx);font:600 15px system-ui}
+#roll .gl{font:600 11px system-ui;color:var(--dm);text-transform:uppercase}#roll .cr{display:flex;flex-wrap:wrap;gap:6px}#roll .cr button{flex:1 1 30%;min-height:44px;font-size:14px}#roll button.on{border-color:var(--ac);color:var(--ac)}#roll button.go{background:var(--ac);color:#000;border:0}
 [hidden]{display:none!important}
 #top button{width:38px;height:30px;border:1px solid #333;border-radius:8px;background:#0008;color:#ddd;font-size:18px}
 @media (orientation:landscape){
@@ -57,9 +59,9 @@ html,body{margin:0;height:100%;background:#000;color:var(--tx);font-family:syste
  #btn{width:64px;height:64px}
 }
 </style></head><body>
-<video id="vid" playsinline muted autoplay></video>
+<div id="fr"><video id="vid" playsinline muted autoplay></video><div id="flash"></div></div>
 <div id="top"><span id="hud"></span><button id="rotb" title="Bild drehen">↻</button><span id="fi"></span></div>
-<div id="msg" hidden></div><div id="flash"></div>
+<div id="msg" hidden></div>
 <div id="bot">
  <div id="meter"><b id="nd"></b><span id="mv"></span></div>
  <div id="wh">
@@ -72,7 +74,7 @@ html,body{margin:0;height:100%;background:#000;color:var(--tx);font-family:syste
 <div id="roll" hidden><div><h3 id="rt"></h3><div id="rb" style="display:flex;flex-direction:column;gap:10px"></div><button id="rc">Abbrechen</button></div></div>
 <script>
 const $=i=>document.getElementById(i),cv=(w,h)=>{const c=document.createElement('canvas');c.width=w;c.height=h;return c};
-const MQ=matchMedia('(orientation:landscape)'),IS=()=>MQ.matches?48:76,VER='v0.6';
+const MQ=matchMedia('(orientation:landscape)'),IS=()=>MQ.matches?48:76,VER='v0.7';
 const S=[1,1/2,1/4,1/8,1/15,1/30,1/60,1/125,1/250,1/500,1/1000],SL=['1"','1/2','1/4','1/8','1/15','1/30','1/60','1/125','1/250','1/500','1/1000'];
 const A=[1.4,2,2.8,4,5.6,8,11,16,22];
 const L=[{f:28,a:2.8,v:.45},{f:35,a:2,v:.32},{f:50,a:1.4,v:.22},{f:135,a:2.8,v:.14},{f:200,a:4,v:.10}];
@@ -81,13 +83,22 @@ const F=[{n:'Agfa APX 400',iso:400,bw:1,g:.075,c:1.2,sat:0,m:[1,1,1]},
 {n:'Kodak Gold 200',iso:200,g:.03,c:.9,sat:1.05,m:[1.1,1.03,.82]}];
 const LIN=new Float32Array(256).map((_,i)=>Math.pow(i/255,2.2));
 const nz=new Float32Array(65536).map(()=>(Math.random()+Math.random()+Math.random()-1.5)*2);
-let st={t:8,a:5,l:2,f:1,n:0};try{Object.assign(st,JSON.parse(localStorage.getItem('kamSt')))}catch(e){}
+let st={t:8,a:5,l:2,f:1,fm:'35',cur:null,seq:0,rolls:{}};try{Object.assign(st,JSON.parse(localStorage.getItem('kamSt')))}catch(e){}
 let ROT=st.r||0;
 let W=360,H=640;
 const vid=$('vid'),src=cv(W,H),sx=src.getContext('2d'),mc=cv(24,32),mx=mc.getContext('2d',{willReadFrequently:true});
 sx.fillStyle='#000';sx.fillRect(0,0,W,H);
 let sceneEV=12,meterL=.18,busy=0;
 const minA=()=>A.findIndex(x=>x>=L[st.l].a-.01);
+const FM={'35':{n:'35mm',opts:[12,24,36]},'66':{n:'6x6',opts:[12,24]}};
+const cr=()=>st.rolls[st.cur]||null;
+const asp=()=>{const c=cr(),fm=c?c.fmt:st.fm;return fm==='66'?1:(innerWidth>innerHeight?1.5:2/3)};
+function layout(){const tb=$('top').getBoundingClientRect(),bb=$('bot').getBoundingClientRect(),ls=innerWidth>innerHeight,
+ x1=ls?bb.left:innerWidth,y0=tb.bottom,y1=ls?innerHeight:bb.top,ar=asp();
+ let fw=x1-8,fh=fw/ar;const ah=y1-y0-8;if(fh>ah){fh=ah;fw=fh*ar}
+ fw=Math.max(40,Math.floor(fw));fh=Math.max(40,Math.floor(fh));
+ const f=$('fr').style;f.width=fw+'px';f.height=fh+'px';f.left=Math.round((x1-fw)/2)+'px';f.top=Math.round(y0+(y1-y0-fh)/2)+'px';
+ const od=ROT%180;vid.style.width=(od?fh:fw)+'px';vid.style.height=(od?fw:fh)+'px'}
 
 function mk(id,lab,set){const el=$(id);lab.forEach(x=>{const i=document.createElement('i');i.textContent=x;el.append(i)});let tm;
  el.onscroll=()=>{clearTimeout(tm);tm=setTimeout(()=>set(Math.max(0,Math.min(lab.length-1,Math.round((MQ.matches?el.scrollTop:el.scrollLeft)/IS())))),80)};
@@ -101,11 +112,11 @@ for(const [el,k] of [[s1,'t'],[s2,'a'],[s3,'l']])el._k=k;
 function ui(){const l=L[st.l],f=F[st.f];
  for(const el of [s1,s2,s3])[...el.children].forEach((c,i)=>{c.classList.toggle('on',i==st[el._k]);if(el===s2)c.classList.toggle('off',A[i]<l.a-.01)});
  $('hud').innerHTML=`<b>${SL[st.t]}</b> f/${A[st.a]} ${l.f}mm`;
- $('fi').textContent=f.n+' · ISO '+f.iso;
- $('cn').textContent=st.n+'/36';
+ const c=cr();$('fi').textContent=c?f.n+' · '+FM[c.fmt].n:'Kein Film';
+ $('cn').textContent=c?c.n+'/'+c.tot:'–';
  $('info').textContent=(f.bw?'S/W':'Farbe')+'\n'+VER;
- const full=st.n>=36;$('btn').disabled=full;$('btn').hidden=full;$('nf').hidden=!full;
- try{localStorage.setItem('kamSt',JSON.stringify(st))}catch(e){}}
+ const full=!c||c.n>=c.tot;$('btn').disabled=full;$('btn').hidden=full;$('nf').hidden=!full;$('nf').textContent=c?'Film voll – entnehmen':'Film einlegen';
+ try{localStorage.setItem('kamSt',JSON.stringify(st))}catch(e){}layout()}
 
 (function(){const m=$('meter');for(let i=-3;i<=3;i++){const s=document.createElement('span');s.className='t';s.style.left=(i+3)/6*100+'%';s.textContent=i?(i>0?'+':'')+i:'0';m.append(s)}})();
 
@@ -117,7 +128,7 @@ function P(){const f=F[st.f],l=L[st.l],t=S[st.t],N=Math.max(A[st.a],l.a);
 function drawVid(c,w,h,a,z){const vw=vid.videoWidth,vh=vid.videoHeight,od=ROT%180,dw=od?h:w,dh=od?w:h,asp=dw/dh;let cw,ch;
  if(vw/vh>asp){ch=vh;cw=vh*asp}else{cw=vw;ch=vw/asp}cw/=z;ch/=z;c.save();c.globalAlpha=a;
  c.translate(w/2,h/2);c.rotate(ROT*Math.PI/180);c.drawImage(vid,(vw-cw)/2,(vh-ch)/2,cw,ch,-dw/2,-dh/2,dw,dh);c.restore()}
-function dims(){const L=innerWidth>innerHeight,nw=L?640:360,nh=L?360:640;if(src.width!==nw){src.width=nw;src.height=nh;W=nw;H=nh;sx.fillStyle='#000';sx.fillRect(0,0,W,H)}}
+function dims(){const ar=asp(),base=ar===1?480:640,nw=ar>=1?base:Math.round(base*ar),nh=ar>=1?Math.round(base/ar):base;if(src.width!==nw||src.height!==nh){src.width=nw;src.height=nh;W=nw;H=nh;sx.fillStyle='#000';sx.fillRect(0,0,W,H)}}
 
 function grade(sc_,tc,w,h,p,bpx){
  const img=sc_.getContext('2d').getImageData(0,0,w,h),d=img.data;let bd=null;
@@ -142,7 +153,7 @@ let last=0,lastS=0,evBase=12,evOk=0,lastCT=-1,lastCTt=0,lastRs=0;
 function loop(t){requestAnimationFrame(loop);
  if(vid.videoWidth&&!document.hidden){if(vid.currentTime!==lastCT){lastCT=vid.currentTime;lastCTt=t}else if(t-lastCTt>2500&&t-lastRs>5000){lastRs=t;lastCTt=t;restart()}}
  if(t-last<33||!vid.videoWidth)return;last=t;dims();
- try{const p=P();vid.classList.toggle('rot',ROT%180!==0);vid.style.transform=(ROT%180?'translate(-50%,-50%) ':'')+'rotate('+ROT+'deg) scale('+p.z+')';
+ try{const p=P();vid.style.transform='translate(-50%,-50%) rotate('+ROT+'deg) scale('+p.z+')';
  const tr=vid.srcObject&&vid.srcObject.getVideoTracks()[0];
  if(tr&&t-lastS>500){lastS=t;try{const g=tr.getSettings(),ts=g.exposureTime*1e-4;evOk=g.exposureTime>0&&g.iso>0&&ts>1e-6&&ts<1;if(evOk)evBase=Math.log2(3.24/ts)-Math.log2(g.iso/100)}catch(e){evOk=0}}
  $('info').textContent=(F[st.f].bw?'S/W':'Farbe')+(evOk?'':' · Schätzwert')+'\n'+VER;drawVid(sx,W,H,p.a,p.z);
@@ -153,17 +164,32 @@ function loop(t){requestAnimationFrame(loop);
  $('mv').textContent=(p.stops>0?'+':'')+p.stops.toFixed(1)+' EV';$('nd').style.background=Math.abs(p.stops)<.4?'#4cd964':'var(--ac)';
  }catch(e){console.error(e)}}
 
-function shoot(){if(busy||st.n>=36)return;busy=1;const p=P(),ls=innerWidth>innerHeight,w=ls?1920:1080,h=ls?1080:1920,hc=cv(w,h),hx=hc.getContext('2d');
+function shoot(){const c=cr();if(busy||!c||c.n>=c.tot)return;busy=1;const p=P(),ar=asp(),big=c.fmt==='66'?1440:1920,w=ar>=1?big:Math.round(big*ar),h=ar>=1?Math.round(big/ar):big,hc=cv(w,h),hx=hc.getContext('2d');
  if(p.a<1)hx.drawImage(src,0,0,w,h);drawVid(hx,w,h,p.a<1?.5:1,p.z);
  const oc=cv(w,h);grade(hc,oc,w,h,p,p.br*Math.max(w,h));
  const fl=$('flash');fl.style.transition='none';fl.style.opacity=.8;requestAnimationFrame(()=>{fl.style.transition='opacity .25s';fl.style.opacity=0});
- navigator.vibrate&&navigator.vibrate(30);st.n++;const nr=st.n;
- oc.toBlob(b=>{const a=document.createElement('a');a.href=URL.createObjectURL(b);a.download='foto_'+F[st.f].n.replace(/\s+/g,'_')+'_'+String(nr).padStart(2,'0')+'.jpg';document.body.append(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(a.href),4000);busy=0},'image/jpeg',.92);
+ navigator.vibrate&&navigator.vibrate(30);c.n++;const nr=c.n;
+ oc.toBlob(b=>{const a=document.createElement('a');a.href=URL.createObjectURL(b);a.download=c.id+'_'+c.d+'_'+F[c.f].n.replace(/\s+/g,'_')+'_'+FM[c.fmt].n+'_'+c.tot+'exp_'+String(nr).padStart(2,'0')+'von'+c.tot+'.jpg';document.body.append(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(a.href),4000);busy=0},'image/jpeg',.92);
  ui()}
 
-function openRoll(){const full=st.n>=36;$('rt').textContent=full?'Film voll – neuen Film einlegen':'Film wechseln (aktueller Film wird entnommen)';
- $('rc').hidden=full;$('rb').innerHTML='';F.forEach((f,i)=>{const b=document.createElement('button');b.textContent=f.n+' · ISO '+f.iso;
-  b.onclick=()=>{st.f=i;st.n=0;$('roll').hidden=true;ui()};$('rb').append(b)});$('roll').hidden=false}
+let SEL={fmt:st.fm,f:st.f,tot:36};
+const el=(t,x,c)=>{const e=document.createElement(t);if(x!=null)e.textContent=x;if(c)e.className=c;return e};
+function chips(p,lab,items,cur,pick){p.append(el('div',lab,'gl'));const q=el('div',null,'cr');items.forEach(([l,v])=>{const b=el('button',l,v===cur?'on':'');b.onclick=()=>pick(v);q.append(b)});p.append(q)}
+const rl=q=>q.id+' · '+F[q.f].n+' · '+FM[q.fmt].n+' · '+q.n+'/'+q.tot;
+function insert(id){const c=st.rolls[id];st.cur=id;st.f=c.f;st.fm=c.fmt;$('roll').hidden=true;ui()}
+function eject(){const c=cr();if(c.n===0||c.n>=c.tot)delete st.rolls[c.id];st.cur=null;ui();openRoll()}
+function newRoll(){const d=new Date(),id='R'+String(++st.seq).padStart(3,'0');st.rolls[id]={id,f:SEL.f,fmt:SEL.fmt,tot:SEL.tot,n:0,d:''+d.getFullYear()+String(d.getMonth()+1).padStart(2,'0')+String(d.getDate()).padStart(2,'0')};insert(id)}
+function openRoll(){const c=cr(),rb=$('rb');rb.innerHTML='';$('rc').hidden=false;
+ if(c){const full=c.n>=c.tot;$('rt').textContent=full?'Film voll':'Film entnehmen?';rb.append(el('div',rl(c),'gl'));
+  const b=el('button',full?'Vollen Film entnehmen':'Im Wechselsack entnehmen (Stand wird gemerkt)');b.onclick=eject;rb.append(b)}
+ else{$('rt').textContent='Film einlegen';const fo=FM[SEL.fmt].opts;if(!fo.includes(SEL.tot))SEL.tot=fo[fo.length-1];
+  const pt=Object.values(st.rolls).filter(q=>q.n<q.tot);
+  if(pt.length){rb.append(el('div','Angefangene Filme','gl'));pt.forEach(q=>{const b=el('button',rl(q));b.onclick=()=>insert(q.id);rb.append(b)})}
+  chips(rb,'Neuer Film · Format',[['Kleinbild 35mm','35'],['6x6','66']],SEL.fmt,v=>{SEL.fmt=v;openRoll()});
+  chips(rb,'Filmtyp',F.map((f,i)=>[f.n,i]),SEL.f,v=>{SEL.f=v;openRoll()});
+  chips(rb,'Aufnahmen pro Rolle',fo.map(n=>[''+n,n]),SEL.tot,v=>{SEL.tot=v;openRoll()});
+  const g=el('button','Film einlegen','go');g.onclick=newRoll;rb.append(g)}
+ $('roll').hidden=false}
 $('btn').onclick=shoot;$('nf').onclick=openRoll;$('fi').onclick=openRoll;$('rc').onclick=()=>$('roll').hidden=true;
 
 function restart(){const s=vid.srcObject;if(s)s.getTracks().forEach(k=>k.stop());vid.srcObject=null;start()}
@@ -173,8 +199,8 @@ async function start(){try{const s=await navigator.mediaDevices.getUserMedia({vi
 $('msg').onclick=start;
 $('rotb').onclick=()=>{ROT=(ROT+90)%360;st.r=ROT;ui()};
 document.body.addEventListener('touchstart',()=>{if(vid.paused&&vid.srcObject)vid.play().catch(()=>{})},{passive:true});
-MQ.addEventListener('change',()=>setTimeout(()=>{sc(s1,st.t);sc(s2,Math.max(st.a,minA()));sc(s3,st.l)},150));
+MQ.addEventListener('change',()=>setTimeout(()=>{layout();sc(s1,st.t);sc(s2,Math.max(st.a,minA()));sc(s3,st.l)},150));
 document.addEventListener('visibilitychange',()=>{if(document.hidden)return;const s=vid.srcObject;if(s&&s.getVideoTracks().some(t=>t.readyState==='live'))vid.play().catch(()=>{});else start()});
-ui();requestAnimationFrame(()=>{sc(s1,st.t);sc(s2,Math.max(st.a,minA()));sc(s3,st.l)});
+addEventListener('resize',layout);new ResizeObserver(layout).observe($('bot'));ui();if(!cr())openRoll();requestAnimationFrame(()=>{sc(s1,st.t);sc(s2,Math.max(st.a,minA()));sc(s3,st.l)});
 start();requestAnimationFrame(loop);
 </script></body></html>

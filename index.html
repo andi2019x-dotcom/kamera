@@ -40,6 +40,7 @@ html,body{margin:0;height:100%;background:#000;color:var(--tx);font-family:syste
 #roll>div{width:100%;max-width:380px;background:var(--pn);border-radius:16px;padding:18px;display:flex;flex-direction:column;gap:10px}
 #roll h3{margin:0 0 4px}#roll button{height:54px;border-radius:10px;border:1px solid #444;background:#222;color:var(--tx);font:600 16px system-ui}
 [hidden]{display:none!important}
+#top button{width:38px;height:30px;border:1px solid #333;border-radius:8px;background:#0008;color:#ddd;font-size:18px}
 @media (orientation:landscape){
  :root{--pw:min(330px,46vw)}
  #top{right:var(--pw)}
@@ -57,7 +58,7 @@ html,body{margin:0;height:100%;background:#000;color:var(--tx);font-family:syste
 }
 </style></head><body>
 <video id="vid" playsinline muted autoplay></video>
-<div id="top"><span id="hud"></span><span id="fi"></span></div>
+<div id="top"><span id="hud"></span><button id="rotb" title="Bild drehen">↻</button><span id="fi"></span></div>
 <div id="msg" hidden></div><div id="flash"></div>
 <div id="bot">
  <div id="meter"><b id="nd"></b><span id="mv"></span></div>
@@ -71,7 +72,7 @@ html,body{margin:0;height:100%;background:#000;color:var(--tx);font-family:syste
 <div id="roll" hidden><div><h3 id="rt"></h3><div id="rb" style="display:flex;flex-direction:column;gap:10px"></div><button id="rc">Abbrechen</button></div></div>
 <script>
 const $=i=>document.getElementById(i),cv=(w,h)=>{const c=document.createElement('canvas');c.width=w;c.height=h;return c};
-const MQ=matchMedia('(orientation:landscape)'),IS=()=>MQ.matches?48:76,VER='v0.5';
+const MQ=matchMedia('(orientation:landscape)'),IS=()=>MQ.matches?48:76,VER='v0.6';
 const S=[1,1/2,1/4,1/8,1/15,1/30,1/60,1/125,1/250,1/500,1/1000],SL=['1"','1/2','1/4','1/8','1/15','1/30','1/60','1/125','1/250','1/500','1/1000'];
 const A=[1.4,2,2.8,4,5.6,8,11,16,22];
 const L=[{f:28,a:2.8,v:.45},{f:35,a:2,v:.32},{f:50,a:1.4,v:.22},{f:135,a:2.8,v:.14},{f:200,a:4,v:.10}];
@@ -81,7 +82,9 @@ const F=[{n:'Agfa APX 400',iso:400,bw:1,g:.075,c:1.2,sat:0,m:[1,1,1]},
 const LIN=new Float32Array(256).map((_,i)=>Math.pow(i/255,2.2));
 const nz=new Float32Array(65536).map(()=>(Math.random()+Math.random()+Math.random()-1.5)*2);
 let st={t:8,a:5,l:2,f:1,n:0};try{Object.assign(st,JSON.parse(localStorage.getItem('kamSt')))}catch(e){}
-const vid=$('vid'),W=360,H=640,src=cv(W,H),sx=src.getContext('2d'),mc=cv(24,32),mx=mc.getContext('2d',{willReadFrequently:true});
+let ROT=st.r||0;
+let W=360,H=640;
+const vid=$('vid'),src=cv(W,H),sx=src.getContext('2d'),mc=cv(24,32),mx=mc.getContext('2d',{willReadFrequently:true});
 sx.fillStyle='#000';sx.fillRect(0,0,W,H);
 let sceneEV=12,meterL=.18,busy=0;
 const minA=()=>A.findIndex(x=>x>=L[st.l].a-.01);
@@ -111,17 +114,17 @@ function P(){const f=F[st.f],l=L[st.l],t=S[st.t],N=Math.max(A[st.a],l.a);
  const al=[1,.5,.38,.28,.2,.14];const a=t<1/15-1e-6?1:t>=1?.14:t>=.5?.2:t>=.25?.28:t>=.125?.38:.5;
  return{f,stops:sceneEV-ev,z:l.f/28,a,vig:l.v*(1.3-.6*op),br:.011*Math.pow(1-op,1.5)*Math.min(1.6,Math.max(.6,l.f/50))}}
 
-function drawVid(c,w,h,a,z){const vw=vid.videoWidth,vh=vid.videoHeight,rot=vw>vh,asp=rot?h/w:w/h;let cw,ch;
+function drawVid(c,w,h,a,z){const vw=vid.videoWidth,vh=vid.videoHeight,od=ROT%180,dw=od?h:w,dh=od?w:h,asp=dw/dh;let cw,ch;
  if(vw/vh>asp){ch=vh;cw=vh*asp}else{cw=vw;ch=vw/asp}cw/=z;ch/=z;c.save();c.globalAlpha=a;
- if(rot){c.translate(0,h);c.rotate(-Math.PI/2);c.drawImage(vid,(vw-cw)/2,(vh-ch)/2,cw,ch,0,0,h,w)}
- else c.drawImage(vid,(vw-cw)/2,(vh-ch)/2,cw,ch,0,0,w,h);c.restore()}
+ c.translate(w/2,h/2);c.rotate(ROT*Math.PI/180);c.drawImage(vid,(vw-cw)/2,(vh-ch)/2,cw,ch,-dw/2,-dh/2,dw,dh);c.restore()}
+function dims(){const L=innerWidth>innerHeight,nw=L?640:360,nh=L?360:640;if(src.width!==nw){src.width=nw;src.height=nh;W=nw;H=nh;sx.fillStyle='#000';sx.fillRect(0,0,W,H)}}
 
 function grade(sc_,tc,w,h,p,bpx){
  const img=sc_.getContext('2d').getImageData(0,0,w,h),d=img.data;let bd=null;
  if(bpx>.6){const b=cv(w,h),bx=b.getContext('2d'),m=bpx*2;bx.filter='blur('+bpx+'px)';bx.drawImage(sc_,-m,-m,w+2*m,h+2*m);bd=bx.getImageData(0,0,w,h).data}
  const f=p.f,k=.8*f.c,E=Math.pow(2,p.stops);
  const T=[0,1,2].map(c=>{const t=new Uint8ClampedArray(256);for(let v=0;v<256;v++){const x=LIN[v]*f.m[c]*E+1e-5;t[v]=255/(1+Math.exp(-k*Math.log2(x/.18)))}return t});
- const cx=w/2,cy=h/2,md=cx*cx+cy*cy,gs=360/w,amt=f.g*255*(1+Math.max(0,-p.stops)*.12),sat=f.sat,bw=f.bw,vg=p.vig;
+ const cx=w/2,cy=h/2,md=cx*cx+cy*cy,gs=360/Math.min(w,h),amt=f.g*255*(1+Math.max(0,-p.stops)*.12),sat=f.sat,bw=f.bw,vg=p.vig;
  const xi=new Int32Array(w);for(let i=0;i<w;i++)xi[i]=(i*gs)|0;
  const ox=Math.random()*256|0,oy=Math.random()*256|0,T0=T[0],T1=T[1],T2=T[2];
  for(let y=0;y<h;y++){const dy=(y-cy)*(y-cy),yr=((((y*gs)|0)+oy)&255)<<8;
@@ -138,8 +141,8 @@ function grade(sc_,tc,w,h,p,bpx){
 let last=0,lastS=0,evBase=12,evOk=0,lastCT=-1,lastCTt=0,lastRs=0;
 function loop(t){requestAnimationFrame(loop);
  if(vid.videoWidth&&!document.hidden){if(vid.currentTime!==lastCT){lastCT=vid.currentTime;lastCTt=t}else if(t-lastCTt>2500&&t-lastRs>5000){lastRs=t;lastCTt=t;restart()}}
- if(t-last<33||!vid.videoWidth)return;last=t;
- try{const p=P();const rt=vid.videoWidth>vid.videoHeight&&innerHeight>=innerWidth;vid.classList.toggle('rot',rt);vid.style.transform=(rt?'translate(-50%,-50%) rotate(-90deg) ':'')+'scale('+p.z+')';
+ if(t-last<33||!vid.videoWidth)return;last=t;dims();
+ try{const p=P();vid.classList.toggle('rot',ROT%180!==0);vid.style.transform=(ROT%180?'translate(-50%,-50%) ':'')+'rotate('+ROT+'deg) scale('+p.z+')';
  const tr=vid.srcObject&&vid.srcObject.getVideoTracks()[0];
  if(tr&&t-lastS>500){lastS=t;try{const g=tr.getSettings(),ts=g.exposureTime*1e-4;evOk=g.exposureTime>0&&g.iso>0&&ts>1e-6&&ts<1;if(evOk)evBase=Math.log2(3.24/ts)-Math.log2(g.iso/100)}catch(e){evOk=0}}
  $('info').textContent=(F[st.f].bw?'S/W':'Farbe')+(evOk?'':' · Schätzwert')+'\n'+VER;drawVid(sx,W,H,p.a,p.z);
@@ -150,9 +153,9 @@ function loop(t){requestAnimationFrame(loop);
  $('mv').textContent=(p.stops>0?'+':'')+p.stops.toFixed(1)+' EV';$('nd').style.background=Math.abs(p.stops)<.4?'#4cd964':'var(--ac)';
  }catch(e){console.error(e)}}
 
-function shoot(){if(busy||st.n>=36)return;busy=1;const p=P(),w=1080,h=1920,hc=cv(w,h),hx=hc.getContext('2d');
+function shoot(){if(busy||st.n>=36)return;busy=1;const p=P(),ls=innerWidth>innerHeight,w=ls?1920:1080,h=ls?1080:1920,hc=cv(w,h),hx=hc.getContext('2d');
  if(p.a<1)hx.drawImage(src,0,0,w,h);drawVid(hx,w,h,p.a<1?.5:1,p.z);
- const oc=cv(w,h);grade(hc,oc,w,h,p,p.br*h);
+ const oc=cv(w,h);grade(hc,oc,w,h,p,p.br*Math.max(w,h));
  const fl=$('flash');fl.style.transition='none';fl.style.opacity=.8;requestAnimationFrame(()=>{fl.style.transition='opacity .25s';fl.style.opacity=0});
  navigator.vibrate&&navigator.vibrate(30);st.n++;const nr=st.n;
  oc.toBlob(b=>{const a=document.createElement('a');a.href=URL.createObjectURL(b);a.download='foto_'+F[st.f].n.replace(/\s+/g,'_')+'_'+String(nr).padStart(2,'0')+'.jpg';document.body.append(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(a.href),4000);busy=0},'image/jpeg',.92);
@@ -168,6 +171,7 @@ async function start(){try{const s=await navigator.mediaDevices.getUserMedia({vi
  vid.srcObject=s;await vid.play();s.getVideoTracks()[0].onended=restart;$('msg').hidden=true}
  catch(e){$('msg').hidden=false;$('msg').textContent='Kamera nicht verfügbar ('+(e.message||e.name)+'). Tippen für neuen Versuch.'}}
 $('msg').onclick=start;
+$('rotb').onclick=()=>{ROT=(ROT+90)%360;st.r=ROT;ui()};
 document.body.addEventListener('touchstart',()=>{if(vid.paused&&vid.srcObject)vid.play().catch(()=>{})},{passive:true});
 MQ.addEventListener('change',()=>setTimeout(()=>{sc(s1,st.t);sc(s2,Math.max(st.a,minA()));sc(s3,st.l)},150));
 document.addEventListener('visibilitychange',()=>{if(document.hidden)return;const s=vid.srcObject;if(s&&s.getVideoTracks().some(t=>t.readyState==='live'))vid.play().catch(()=>{});else start()});
